@@ -1358,6 +1358,151 @@ sc_midi_korg_write_scene (snd_seq_t *seq, snd_seq_addr_t addr, uint8_t dev_id[4]
   return 0; 
 }
 
+
+typedef struct {
+  uint8_t id;
+  uint16_t value;
+} matriarch_message;
+
+static void
+process_matriarch_message (snd_seq_event_t *ev, matriarch_message *matr_msg)
+{
+  const unsigned int len = ev->data.ext.len;
+  const uint8_t* input = ev->data.ext.ptr;
+
+  if (len == 16)
+  {
+    matr_msg->id = input[4];
+    matr_msg->value = (u_int16_t) input[5] << 8 | input[6];
+  }
+  else
+  {
+    fprintf (stderr, "%s): unexpected message: len %d: ", __func__,len);
+    for (int i=0; i < len; ++i)
+      fprintf(stderr, "%02x ", (uint8_t)input[i]);
+    fprintf(stderr, "\n");
+  }
+}
+
+static int
+sc_midi_matriarch_read_next (snd_seq_t *seq, matriarch_message *matr_msg)
+{
+  struct pollfd pfds[1] = {};
+  matriarch_message matr_msg_in = {0};
+  snd_seq_event_t *ev;
+  int ret, pfds_n = 0;
+
+  pfds_n = snd_seq_poll_descriptors(seq, pfds, 1, POLLIN);
+
+  while (1)
+  {
+    if (snd_seq_event_input_pending (seq, 0) == 0)
+    {
+      ret = poll (pfds, pfds_n, READ_TIMEOUT_MS);
+      if (ret < 0)
+      {
+        fprintf (stderr, "%s(%08x) poll failed %d (%s)\n", __func__, matr_msg->id, -errno, strerror(errno));
+        return -errno;
+      }
+      if (ret == 0)
+      {
+        fprintf (stderr, "%s(%08x) poll timeout %d\n", __func__, matr_msg->id, ret);
+        return -ETIMEDOUT;
+      }
+    }
+
+    ret = snd_seq_event_input (seq, &ev);
+
+    if (ret == -EAGAIN)
+      continue;
+
+    if (ret < 0)
+    {
+      fprintf (stderr, "%s(%08x) snd_seq_event_input failed %d\n", __func__, matr_msg->id, ret);
+      return ret;
+    }
+
+    process_matriarch_message (ev, &matr_msg_in);
+
+    *matr_msg = matr_msg_in;
+    return 0;
+  }
+}
+
+int
+sc_midi_matriarch_read_control (snd_seq_t *seq, snd_seq_addr_t addr, uint32_t control_id, uint16_t *val)
+{
+  uint8_t data[] = {0xf0, 0x04, 0x17, 0x3e, control_id, 0x00, 0x00, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x7f, 0xf7};
+  matriarch_message matriarch_msg;
+  snd_seq_event_t ev;
+  int err;
+
+  //printf ("read_control_value %02x\n", control_id);
+
+  snd_seq_ev_clear (&ev);
+  snd_seq_ev_set_source (&ev, 0);
+  snd_seq_ev_set_dest (&ev, addr.client, addr.port);
+  snd_seq_ev_set_direct (&ev);
+  snd_seq_ev_set_sysex (&ev, sizeof data, data);
+
+
+  err = snd_seq_event_output (seq, &ev);
+  if (err < 0)
+  {
+    fprintf (stderr, "%s(%04x) snd_seq_event_output failed %d\n", __func__, control_id, err);
+    return err;
+  }
+
+  err = snd_seq_drain_output(seq);
+  if (err < 0)
+  {
+    fprintf (stderr, "%s(%04x) snd_seq_drain_output failed %d\n", __func__, control_id, err);
+    return err;
+  }
+
+  err = sc_midi_matriarch_read_next (seq, &matriarch_msg);
+  if (err < 0)
+    return err;
+
+  *val = matriarch_msg.value;
+
+  return 0;
+}
+
+
+int
+sc_midi_matriarch_write_control (snd_seq_t *seq, snd_seq_addr_t addr, uint32_t control_id, uint16_t val)
+{
+  uint8_t value_left_byte = (uint8_t) ((val & 0xFF00) >> 8);
+  uint8_t value_right_byte = (uint8_t) (val & 0x00FF);
+
+  uint8_t data[] = {0xf0, 0x04, 0x17, 0x23, control_id, value_left_byte, value_right_byte, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x7f, 0xf7};
+  snd_seq_event_t ev;
+  int err;
+
+  snd_seq_ev_clear (&ev);
+  snd_seq_ev_set_source (&ev, 0);
+  snd_seq_ev_set_dest (&ev, addr.client, addr.port);
+  snd_seq_ev_set_direct (&ev);
+  snd_seq_ev_set_sysex (&ev, sizeof data, data);
+
+  err = snd_seq_event_output (seq, &ev);
+  if (err < 0)
+  {
+    fprintf (stderr, "%s(%08x): snd_seq_event_output failed %d\n", __func__, control_id, err);
+    return err;
+  }
+
+  err = snd_seq_drain_output (seq);
+  if (err < 0)
+  {
+    fprintf (stderr, "%s(%08x): snd_seq_drain_output failed %d\n", __func__, control_id, err);
+    return err;
+  }
+
+  return 0;
+}
+
 int
 sc_midi_disconnect (snd_seq_t *seq, snd_seq_addr_t addr)
 {

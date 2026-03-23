@@ -29,6 +29,7 @@ These devices are supported and tested:
 - Korg nanoKONTROL
 - Korg nanoKONTROL2
 - Korg nanoPAD2
+- Moog Matriarch
 
 These might also work, but have not been tested yet:
 - Akai MPD218
