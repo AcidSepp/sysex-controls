@@ -37,6 +37,7 @@ This is a Linux alternative to the MIDI Control Center software.
 <li>Arturia MiniLab mkII</li>
 <li>Arturia MiniLab 3</li>
 <li>Korg nanoKEY2</li>
+<li>Korg nanoKONTROL</li>
 <li>Korg nanoKONTROL2</li>
 <li>Korg nanoPAD2</li>
 </ul>
@@ -50,7 +51,6 @@ This is a Linux alternative to the MIDI Control Center software.
 <li>Arturia SparkLE</li>
 <li>Arturia The Laboratory</li>
 <li>Korg nanoKEY</li>
-<li>Korg nanoKONTROL</li>
 <li>Korg nanoPAD</li>
 </ul>
 <p>
