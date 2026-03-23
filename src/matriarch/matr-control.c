@@ -1,11 +1,10 @@
 #include "matr-control.h"
 
-#include <sc-window.h>
-
 #include "matr-book.h"
+#include "sc-control.h"
 #include "sc-control-value.h"
 #include "sc-navigation-page.h"
-#include "../sc-control.h"
+#include "sc-window.h"
 
 enum {
   PROP_0,

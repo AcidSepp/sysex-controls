@@ -1,7 +1,7 @@
 #pragma once
 
 #include <adwaita.h>
-#include <sc-book.h>
+#include "sc-book.h"
 
 G_BEGIN_DECLS
 
